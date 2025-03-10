@@ -1,3 +1,4 @@
+import fs from "fs";
 import WebSocket from 'ws';
 import { Resolver } from 'node:dns';
 
@@ -167,38 +168,80 @@ const SUS_TLDS = [
   ".to"
 ]
 
-const resolveDomain = (domain) => {
-  resolver.resolve4(domain, (err, addresses) => {
-    console.log(`domain: ${domain}`);
-    console.log("addresses:");
+let IPToDomain = {};
 
-    if (addresses) {
-      addresses.forEach(a => console.log(a));
+const main = () => {
+  fs.access('ip-to-domain-sus.json', fs.constants.F_OK, (err) => {
+    if (err) {
+      console.log("Save file doesn't exist. It will be created.")
     } else {
-      console.log("No addresses associated to this domain.")
+      console.log("Save file found. Loading.")
+      loadSave();
     }
-    
+
+    startConnectionToCertstream();
   });
 }
 
-const ws = new WebSocket(CERTSTREAM_URL);
+const loadSave = () => {
+  fs.readFile('ip-to-domain-sus.json', 'utf8', (err, data) => {
+    IPToDomain = JSON.parse(data);
 
-ws.on('error', console.error);
-
-ws.on('message', (data) => {
-  const resStr = data.toString("utf-8");
-  const certObj = JSON.parse(resStr);
-
-  SUS_TLDS.forEach(tld => {
-    const examinedCN = certObj.data.leaf_cert.subject.CN;
-
-    if (examinedCN.endsWith(tld)) {
-      resolveDomain(examinedCN);
+    if (err) {
+      console.error(err);
+      return;
     }
-  })
-});
+  });
+}
 
-//ping the certserver every 30s to maintain connection as specified on gh page
-setInterval(() => {
-  ws.ping();
-}, 30000);
+const resolveDomain = (domain) => {
+  resolver.resolve4(domain, (err, addresses) => {
+
+    if (addresses) {
+      addresses.forEach(ip => {
+        if (!IPToDomain[ip]) {
+          IPToDomain[ip] = [];
+        }
+
+        if (!IPToDomain[ip].includes(domain)) {
+          IPToDomain[ip].push(domain);
+        }
+      });
+    }
+
+    fs.writeFile('ip-to-domain-sus.json', JSON.stringify(IPToDomain, null, 2), err => {
+      if (err) {
+        console.error(err);
+      } else {
+        console.log("File updated: ip-to-domain-sus.json")
+      }
+    });
+
+  });
+}
+
+const startConnectionToCertstream = () => {
+  const ws = new WebSocket(CERTSTREAM_URL);
+
+  ws.on('error', console.error);
+
+  ws.on('message', (data) => {
+    const resStr = data.toString("utf-8");
+    const certObj = JSON.parse(resStr);
+
+    SUS_TLDS.forEach(tld => {
+      const examinedCN = certObj.data.leaf_cert.subject.CN;
+
+      if (examinedCN.endsWith(tld)) {
+        resolveDomain(examinedCN);
+      }
+    })
+  });
+
+  //ping the certserver every 30s to maintain connection as specified on gh page
+  setInterval(() => {
+    ws.ping();
+  }, 30000);
+}
+
+main();
