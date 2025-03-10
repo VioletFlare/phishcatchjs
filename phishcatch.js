@@ -172,18 +172,22 @@ let IPToDomain = {};
 
 const main = () => {
   fs.access('ip-to-domain-sus.json', fs.constants.F_OK, (err) => {
-    if (err) {
-      console.log("Save file doesn't exist. It will be created.")
-    } else {
-      console.log("Save file found. Loading.")
-      loadSave();
-    }
 
-    startConnectionToCertstream();
+    const saveLoadedPromise = new Promise((resolve) => {
+      if (err) {
+        console.log("Save file doesn't exist. It will be created.")
+        resolve();
+      } else {
+        console.log("Save file found. Loading.")
+        loadSave(resolve);
+      }
+    })
+
+    saveLoadedPromise.then(() => startConnectionToCertstream());
   });
 }
 
-const loadSave = () => {
+const loadSave = (resolve) => {
   fs.readFile('ip-to-domain-sus.json', 'utf8', (err, data) => {
     IPToDomain = JSON.parse(data);
 
@@ -191,6 +195,8 @@ const loadSave = () => {
       console.error(err);
       return;
     }
+
+    resolve();
   });
 }
 
