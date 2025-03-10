@@ -190,6 +190,7 @@ const resolver = new Resolver();
 resolver.setServers([DNS_SERVER]);
 
 let IPToDomain = {};
+let failedRequests = 0;
 
 const main = () => {
   fs.access('ip-to-domain-sus.json', fs.constants.F_OK, (err) => {
@@ -240,14 +241,30 @@ const resolveDomain = (domain) => {
       });
     }
 
-    fs.writeFile('ip-to-domain-sus.json', JSON.stringify(IPToDomain, null, 2), err => {
-      if (err) {
-        console.error(err);
-      } else {
-        console.log("File updated: ip-to-domain-sus.json")
-      }
-    });
+    if (addresses && addresses.length) {
+      fs.writeFile('ip-to-domain-sus.json', JSON.stringify(IPToDomain, null, 2), err => {
+        if (err) {
+          console.error(err);
+        } else {
+          console.log("File updated: ip-to-domain-sus.json")
+        }
+      });
 
+      failedRequests = 0;
+    } else if (failedRequests > 100) {
+      console.error(
+        ```
+Failed to resolve more than 100 requests in a row.        
+Couldn't associate any IPs to Domains.
+Common problems:
+* Mullvad VPN (check this post: https://schnerring.net/blog/use-custom-dns-servers-with-mullvad-and-any-wireguard-client/)
+Retrying...
+
+        ```
+      )
+    } else {
+      failedRequests++;
+    }
   });
 }
 
