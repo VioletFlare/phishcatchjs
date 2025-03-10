@@ -1,11 +1,29 @@
 import fs from "fs";
 import WebSocket from 'ws';
 import { Resolver } from 'node:dns';
-
-const resolver = new Resolver();
-resolver.setServers(['1.1.1.1']);
+import ipRangeCheck from 'ip-range-check';
 
 const CERTSTREAM_URL = "ws://localhost:8081"
+const DNS_SERVER = '1.1.1.1'
+
+//just Cloudflare for now
+const BLACKLISTED_IP_RANGES = [
+  "173.245.48.0/20",
+  "103.21.244.0/22",
+  "103.22.200.0/22",
+  "103.31.4.0/22",
+  "141.101.64.0/18",
+  "108.162.192.0/18",
+  "190.93.240.0/20",
+  "188.114.96.0/20",
+  "197.234.240.0/22",
+  "198.41.128.0/17",
+  "162.158.0.0/15",
+  "104.16.0.0/13",
+  "104.24.0.0/14",
+  "172.64.0.0/13",
+  "131.0.72.0/22"
+];
 
 /*
 const SUS_TLDS = [
@@ -168,6 +186,9 @@ const SUS_TLDS = [
   ".to"
 ]
 
+const resolver = new Resolver();
+resolver.setServers([DNS_SERVER]);
+
 let IPToDomain = {};
 
 const main = () => {
@@ -205,13 +226,17 @@ const resolveDomain = (domain) => {
 
     if (addresses) {
       addresses.forEach(ip => {
-        if (!IPToDomain[ip]) {
-          IPToDomain[ip] = [];
+
+        if (!ipRangeCheck(ip, BLACKLISTED_IP_RANGES)) {
+          if (!IPToDomain[ip]) {
+            IPToDomain[ip] = [];
+          }
+  
+          if (!IPToDomain[ip].includes(domain)) {
+            IPToDomain[ip].push(domain);
+          }
         }
 
-        if (!IPToDomain[ip].includes(domain)) {
-          IPToDomain[ip].push(domain);
-        }
       });
     }
 
